@@ -12,6 +12,7 @@ import {
   subscribeMessages,
   updateMessages,
 } from "@/lib/thread-storage";
+import { toggleTheme } from "@/lib/theme";
 import type { ChatApiError, ChatApiSuccess, ChatMessage } from "@/types/chat";
 
 const SUGGESTIONS = [
@@ -157,14 +158,52 @@ export function Chat() {
             <p className="chat__subtitle">Faça perguntas e veja as fórmulas resolvidas</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="chat__reset"
-          onClick={handleReset}
-          disabled={messages.length === 0 && !error}
-        >
-          Nova conversa
-        </button>
+        <div className="chat__actions">
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label="Alternar tema"
+          >
+            <svg
+              className="theme-toggle__icon theme-toggle__icon--moon"
+              viewBox="0 0 24 24"
+              width="17"
+              height="17"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a7 7 0 0 0 10.8 10.8Z" />
+            </svg>
+            <svg
+              className="theme-toggle__icon theme-toggle__icon--sun"
+              viewBox="0 0 24 24"
+              width="17"
+              height="17"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.4v2.2M12 19.4v2.2M4.2 12H2M22 12h-2.2M6.3 6.3 4.8 4.8M19.2 19.2l-1.5-1.5M17.7 6.3l1.5-1.5M4.8 19.2l1.5-1.5" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="chat__reset"
+            onClick={handleReset}
+            disabled={messages.length === 0 && !error}
+          >
+            Nova conversa
+          </button>
+        </div>
       </header>
 
       <main className="chat__messages" aria-live="polite" aria-busy={isLoading}>

@@ -90,11 +90,67 @@ function escapeLooseJsonStrings(text: string): string {
  * O modelo responde com os delimitadores do LaTeX puro (`\(...\)`, `\[...\]`),
  * que o remark-math não tokeniza. Converte para a sintaxe Markdown que o
  * pipeline de KaTeX entende.
+ *
+ * Percorre caractere a caractere porque `\\[4pt]` — quebra de linha com
+ * espaçamento, usada nos ambientes `align` — contém a sequência `\[` sem ser
+ * um delimitador. Um regex trataria isso como abertura de display e engoliria o
+ * conteúdo até o próximo `\]`.
  */
 function normalizeMathDelimiters(text: string): string {
-  return text
-    .replace(/\\\[([\s\S]*?)\\\]/g, (_, body: string) => `$$${body}$$`)
-    .replace(/\\\(([\s\S]*?)\\\)/g, (_, body: string) => `$$${body}$`);
+  let out = "";
+  let open: "display" | "inline" | null = null;
+  let index = 0;
+
+  while (index < text.length) {
+    const char = text[index];
+
+    if (char !== "\\") {
+      out += char;
+      index += 1;
+      continue;
+    }
+
+    const next = text[index + 1];
+
+    if (next === "\\") {
+      out += next;
+      index += 2;
+      continue;
+    }
+
+    if (next === "[" && open === null) {
+      out += "$$";
+      open = "display";
+      index += 2;
+      continue;
+    }
+
+    if (next === "]" && open === "display") {
+      out += "$$";
+      open = null;
+      index += 2;
+      continue;
+    }
+
+    if (next === "(" && open === null) {
+      out += "$";
+      open = "inline";
+      index += 2;
+      continue;
+    }
+
+    if (next === ")" && open === "inline") {
+      out += "$";
+      open = null;
+      index += 2;
+      continue;
+    }
+
+    out += char;
+    index += 1;
+  }
+
+  return out;
 }
 
 export async function POST(request: Request) {
