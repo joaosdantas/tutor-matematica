@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
 const WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL;
-const REQUEST_TIMEOUT_MS = 60_000;
+const REQUEST_TIMEOUT_MS = 55_000;
 const MAX_MESSAGE_LENGTH = 8_000;
 const MAX_THREAD_ID_LENGTH = 200;
+
+export const maxDuration = 60;
 
 type ChatRequestBody = {
   message: unknown;

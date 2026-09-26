@@ -79,11 +79,17 @@ export function Chat() {
       { id: createId(), role: "user", content: text, createdAt: Date.now() },
     ]);
 
+    let threadId = getThreadId();
+    if (!threadId) {
+      threadId = createId();
+      setThreadId(threadId);
+    }
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, threadId: getThreadId() }),
+        body: JSON.stringify({ message: text, threadId }),
       });
 
       const data: unknown = await response.json();
@@ -96,7 +102,7 @@ export function Chat() {
       }
 
       const payload = data as ChatApiSuccess;
-      setThreadId(payload.threadId?.trim() || createId());
+      setThreadId(payload.threadId?.trim() || threadId);
 
       updateMessages((previous) => [
         ...previous,
