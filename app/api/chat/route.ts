@@ -17,6 +17,86 @@ function cleanString(value: unknown, maxLength: number): string {
   return value.trim().slice(0, maxLength);
 }
 
+/**
+ * O cenário monta o JSON concatenando strings, então o LaTeX do modelo chega
+ * com barras invertidas soltas (`\(`) e quebras de linha cruas. Ambos são
+ * inválidos dentro de uma string JSON e fazem o `JSON.parse` estrito estourar.
+ * Reescapa esses dois casos sem tocar no restante da estrutura.
+ */
+function parseUpstreamJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return JSON.parse(escapeLooseJsonStrings(text));
+  }
+}
+
+const VALID_JSON_ESCAPES = '\\/"bfnrtu';
+
+/**
+ * `\f`, `\b`, `\t` e `\r` são sequências de escape válidas em JSON, então o
+ * `JSON.parse` converte de forma silenciosa: `\frac` vira form feed + "rac" e a
+ * barra some. Controlados por um cenário que monta o JSON concatenando string.
+ * Nenhum desses caracteres tem uso legítimo em Markdown, exceto o tab de
+ * indentação — restaurado apenas quando aparece no meio de um token.
+ */
+function restoreLatexCommands(text: string): string {
+  return text
+    .replace(/\f/g, "\\f")
+    .replace(/\x08/g, "\\b")
+    .replace(/\r/g, "\\r")
+    .replace(/(?<=\S)\t/g, "\\t");
+}
+
+function escapeLooseJsonStrings(text: string): string {
+  let out = "";
+  let inString = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (char === "\\") {
+      const next = text[index + 1];
+      if (next !== undefined && VALID_JSON_ESCAPES.includes(next)) {
+        out += char + next;
+        index += 1;
+      } else {
+        out += "\\\\";
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      out += char;
+      continue;
+    }
+
+    if (!inString || char.charCodeAt(0) >= 0x20) {
+      out += char;
+      continue;
+    }
+
+    if (char === "\n") out += "\\n";
+    else if (char === "\r") out += "\\r";
+    else if (char === "\t") out += "\\t";
+    else out += "\\u0000";
+  }
+
+  return out;
+}
+
+/**
+ * O modelo responde com os delimitadores do LaTeX puro (`\(...\)`, `\[...\]`),
+ * que o remark-math não tokeniza. Converte para a sintaxe Markdown que o
+ * pipeline de KaTeX entende.
+ */
+function normalizeMathDelimiters(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, (_, body: string) => `$$${body}$$`)
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_, body: string) => `$$${body}$`);
+}
+
 export async function POST(request: Request) {
   if (!WEBHOOK_URL) {
     console.error("MAKE_WEBHOOK_URL is not configured on the server.");
@@ -66,8 +146,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const data: unknown = await upstream.json();
-    const payload = data as { response?: unknown; threadId?: unknown };
+    const rawBody = await upstream.text();
+    const payload = parseUpstreamJson(rawBody) as {
+      response?: unknown;
+      threadId?: unknown;
+    } | null;
 
     const response = cleanString(payload?.response, 100_000);
     const resolvedThreadId = cleanString(payload?.threadId, MAX_THREAD_ID_LENGTH);
@@ -80,7 +163,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      response,
+      response: normalizeMathDelimiters(restoreLatexCommands(response)),
       threadId: resolvedThreadId || threadId,
     });
   } catch (error) {
